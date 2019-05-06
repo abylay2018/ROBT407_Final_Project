@@ -11,6 +11,7 @@ from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import concatenate
 from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras import backend as K
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler, EarlyStopping, ReduceLROnPlateau
 import warnings
 warnings.filterwarnings("ignore")
 marks = pd.read_csv('/home/papa/ROBT407_Project/airbus-ship-detection/train_ship_segmentations_v2.csv') # Markers for ships
@@ -115,7 +116,29 @@ def back_IoU(y_true, y_pred):
 def IoU_loss(in_gt, in_pred):
     #return 2 - back_IoU(in_gt, in_pred) - IoU(in_gt, in_pred)
     return 1 - IoU(in_gt, in_pred)
+
+  
+def fit():
+    seg_model.compile(optimizer=Adam(1e-3, decay=1e-6), loss=IoU, metrics=['binary_accuracy'])
     
+    step_count = min(MAX_TRAIN_STEPS, train_df.shape[0]//BATCH_SIZE)
+    aug_gen = create_aug_gen(make_image_gen(train_df))
+    loss_history = [seg_model.fit_generator(aug_gen,
+                                 steps_per_epoch=step_count,
+                                 epochs=MAX_TRAIN_EPOCHS,
+                                 validation_data=(valid_x, valid_y),
+                                 callbacks=callbacks_list,
+                                workers=1 # the generator is not very thread safe
+                                           )]
+    return loss_history
+
+while True:
+    loss_history = fit()
+    if np.min([mh.history['val_loss'] for mh in loss_history]) < -0.2:
+        break
+        
+        
+        
 inputs = Input((768, 768, 3))
 
 c1 = Conv2D(8, (3, 3), activation='relu', padding='same') (inputs)
@@ -154,5 +177,45 @@ model = Model(inputs=[inputs], outputs=[outputs])
 model.compile(optimizer='adam', loss= IoU_loss, metrics=[IoU, back_IoU])
 model.summary()
 
+
+
+weight_path="{}_weights.best.hdf5".format('seg_model')
+
+checkpoint = ModelCheckpoint(weight_path, monitor='val_loss', verbose=1, save_best_only=True, mode='min', save_weights_only=True)
+
+reduceLROnPlat = ReduceLROnPlateau(monitor='val_loss', factor=0.33,
+                                   patience=1, verbose=1, mode='min',
+                                   min_delta=0.0001, cooldown=0, min_lr=1e-8)
+
+early = EarlyStopping(monitor="val_loss", mode="min", verbose=2,
+                      patience=20) # probably needs to be more patient, but kaggle time is limited
+
+callbacks_list = [checkpoint, early, reduceLROnPlat]
+
+
+
+
 #results = model.fit_generator(Generator(images,  = 200), steps_per_epoch = 500, epochs = 30)
-results = model.fit_generator(Generator(images, batch_size = 8), steps_per_epoch = 14500, epochs = 3)
+results = model.fit(Generator(images, batch_size = 8), steps_per_epoch = 14500, epochs = 3)
+
+
+
+def show_loss(loss_history):
+    epochs = np.concatenate([mh.epoch for mh in loss_history])
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(22, 10))
+    
+    _ = ax1.plot(epochs, np.concatenate([mh.history['loss'] for mh in loss_history]), 'b-',
+                 epochs, np.concatenate([mh.history['val_loss'] for mh in loss_history]), 'r-')
+    ax1.legend(['Training', 'Validation'])
+    ax1.set_title('Loss')
+    
+    _ = ax2.plot(epochs, np.concatenate([mh.history['binary_accuracy'] for mh in loss_history]), 'b-',
+                 epochs, np.concatenate([mh.history['val_binary_accuracy'] for mh in loss_history]), 'r-')
+    ax2.legend(['Training', 'Validation'])
+    ax2.set_title('Binary Accuracy (%)')
+
+show_loss(loss_history)
+
+
+seg_model.load_weights(weight_path)
+seg_model.save('seg_model.h5')
