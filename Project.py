@@ -17,104 +17,127 @@ warnings.filterwarnings("ignore")
 marks = pd.read_csv('/home/papa/ROBT407_Project/airbus-ship-detection/train_ship_segmentations_v2.csv') # Markers for ships
 images = os.listdir('/home/papa/ROBT407_Project/airbus-ship-detection/train') # Images for training
 os.chdir("/home/papa/ROBT407_Project/airbus-ship-detection/train")
-
+#Encodes mask to matrix
 def mask_part(pic):
-    '''
-    Function that encodes mask for single ship from .csv entry into numpy matrix
-    '''
-    back = np.zeros(768**2)
-    starts = pic.split()[0::2]
-    lens = pic.split()[1::2]
-    for i in range(len(lens)):
-        back[(int(starts[i])-1):(int(starts[i])-1+int(lens[i]))] = 1
+    back = np.zeros(768**2) #create a numpy array with 0s and size of the image(without channels)
+    starts = pic.split()[0::2] #find the starting pixel index
+    lens = pic.split()[1::2] #find how many of them in a row come together
+    for i in range(len(lens)): 
+        back[(int(starts[i])-1):(int(starts[i])-1+int(lens[i]))] = 1 #"paint" the ship loaction
     return np.reshape(back, (768, 768, 1))
 
 def is_empty(key):
-    '''
-    Function that checks if there is a ship in image
-    '''
-    df = marks[marks['ImageId'] == key].iloc[:,1]
-    if len(df) == 1 and type(df.iloc[0]) != str and np.isnan(df.iloc[0]):
+    
+    #Function that checks if there is a ship in image. 
+    
+    df = marks[marks['ImageId'] == key].iloc[:,1] #create dataframe of the specific image (key) with the mask encodings
+    if len(df) == 1 and type(df.iloc[0]) != str and np.isnan(df.iloc[0]): #if the size is 1, the image has no ships 
         return True
     else:
         return False
     
 def masks_all(key):
-    '''
-    Merges together all the ship markers corresponding to a single image
-    '''
-    df = marks[marks['ImageId'] == key].iloc[:,1]
-    masks= np.zeros((768,768,1))
+    #Merges together all the ship markers corresponding to a single image
+    
+    df = marks[marks['ImageId'] == key].iloc[:,1] #create dataframe of the specific image (key) with the mask encodings
+    masks= np.zeros((768,768,1)) #numpy array of 0s with 3 dimentions
     if is_empty(key):
         return masks
     else:
-        for i in range(len(df)):
-            masks += mask_part(df.iloc[i])
+        for i in range(len(df)): #take the mask of each ship
+            masks += mask_part(df.iloc[i]) #get 1-s where there are ships (masks) 
         return np.transpose(masks, (1,0,2))
         
 def transform(X, Y):
     '''
-    Function for augmenting images. 
-    It takes original image and corresponding mask and performs the
-    same flipping and rotation transforamtions on both in order to 
-    perserve the overlapping of ships and their masks
+    Function for augmenting images. Do that to both X and Y (image and mask)
     '''
-# add noise:
-    x = np.copy(X)
-    y = np.copy(Y)
-    x[:,:,0] = x[:,:,0] + np.random.normal(loc=0.0, scale=0.01, size=(768,768))
-    x[:,:,1] = x[:,:,1] + np.random.normal(loc=0.0, scale=0.01, size=(768,768))
+
+    x = np.copy(X) #do not affect the original image
+    y = np.copy(Y) #do not affect the original mask
+    x[:,:,0] = x[:,:,0] + np.random.normal(loc=0.0, scale=0.01, size=(768,768)) # add some blur to each rgb channel
+    x[:,:,1] = x[:,:,1] + np.random.normal(loc=0.0, scale=0.01, size=(768,768)) 
     x[:,:,2] = x[:,:,2] + np.random.normal(loc=0.0, scale=0.01, size=(768,768))
     # Adding Gaussian noise on each rgb channel; this way we will NEVER get two completely same images.
-    # Note that this transformation is not performed on Y 
-    x[np.where(x<0)] = 0
+    # Note that this transformation is not performed on Y (does not make any sense to do so) 
+    #Preprocess
+    x[np.where(x<0)] = 0 
     x[np.where(x>1)] = 1
-# axes swap:
-    if np.random.rand()<0.5: # 0.5 chances for this transformation to occur (same for two below)
-        x = np.swapaxes(x, 0,1)
+    #Do transformation randomly with 0.5 chance for each
+    if np.random.rand()<0.5: #0.5 chances for this transformation to occur (same for two below)
+        x = np.swapaxes(x, 0,1) 
         y = np.swapaxes(y, 0,1)
-# vertical flip:
+    #Do horizontal and vertical flips
     if np.random.rand()<0.5:
         x = np.flip(x, 0)
         y = np.flip(y, 0)
-# horizontal flip:
+
     if np.random.rand()<0.5:
         x = np.flip(x, 1)
         y = np.flip(y, 1)
     return x, y  
+def plot_transformed(file):
+    '''
+    Plotting five augmentations of one image using trivial method
+    (five images created transforming original with function 'transform()')
+    '''
+    X, Y = plt.imread(file), masks_all(file)
+    plt.figure(figsize = (19,8))
+    plt.subplot(253, title ='Original Image')
+    X, Y = plt.imread(file)/255, masks_all(file)
+    plt.imshow(X)
+    plt.axis('off')
+    plt.subplot(256, title ='Transformed Image')
+    plt.imshow(transform(X,Y)[0])
+    plt.axis('off')
+    plt.subplot(257, title ='Transformed Image')
+    plt.imshow(transform(X,Y)[0])
+    plt.axis('off')    
+    plt.subplot(258, title ='Transformed Image')
+    plt.imshow(transform(X,Y)[0])
+    plt.axis('off')
+    plt.subplot(259, title ='Transformed Image')
+    plt.imshow(transform(X,Y)[0])
+    plt.axis('off')    
+    plt.subplot(2,5,10, title ='Transformed Image')
+    plt.imshow(transform(X,Y)[0])
+    plt.axis('off')
+    plt.suptitle(file,x=0.3, y=0.7, verticalalignment ='top', fontsize = 22)
+    plt.show()
+plot_transformed('0270d7317.jpg')    
+    
 def make_batch(files, batch_size):
     '''
-    Creates batches of images and masks in order to feed them to NN
+    Creates batches of mask along with images 
     '''
-    X = np.zeros((batch_size, 768, 768, 3))
-    Y = np.zeros((batch_size, 768, 768, 1)) # I add 1 here to get 4D batch
+    X = np.zeros((batch_size, 768, 768, 3)) # Create numpy array of zeros for the background 
+    Y = np.zeros((batch_size, 768, 768, 1)) # Create numpy array of zeros for the mask
     for i in range(batch_size):
         ship = np.random.choice(files)
-        X[i] = (io.imread(ship))/255.0 # Original images are in 0-255 range, I want it in 0-1
-        Y[i]= masks_all(ship)
+        X[i] = (io.imread(ship))/255.0 # Normalize the images to be between 0-1
+        Y[i]= masks_all(ship) #Mask every ship in the given image
     return X, Y
 
 def Generator(files, batch_size):
     '''
-    Generates batches of images and corresponding masks
+    This function generates batches of images and their masks
     '''
     while True:
-        X, Y = make_batch(files, batch_size)
+        X, Y = make_batch(files, batch_size) # Create the batches and do transformations one by one
         for i in range(batch_size):
-            X[i], Y[i] = transform(X[i], Y[i])
+            X[i], Y[i] = transform(X[i], Y[i]) #do the random transformations
         yield X, Y
         
-# Intersection over Union for Objects
-def IoU(y_true, y_pred, tresh=1e-10):
-    Intersection = K.sum(y_true * y_pred, axis=[1,2,3])
-    Union = K.sum(y_true, axis=[1,2,3]) + K.sum(y_pred, axis=[1,2,3]) - Intersection
-    return K.mean( (Intersection + tresh) / (Union + tresh), axis=0)
-# Intersection over Union for Background
+# Intersection over as the measure of accuracy
+def IoU(y_true, y_pred, tresh=1e-10): 
+    Intersection = K.sum(y_true * y_pred, axis=[1,2,3]) #Use bitwise AND operation to find the intersection area
+    Union = K.sum(y_true, axis=[1,2,3]) + K.sum(y_pred, axis=[1,2,3]) - Intersection  #Use biwise OR operation similarly
+    return K.mean( (Intersection + tresh) / (Union + tresh), axis=0) #add some tresh as noise
+# Intersection over Union for Background could be found similarly
 def back_IoU(y_true, y_pred):
     return IoU(1-y_true, 1-y_pred)
-# Loss function
+# Loss function is defined to be 1 - IoU which is intuitive. When IoU approaches one, the loss would be close to 0 as expected
 def IoU_loss(in_gt, in_pred):
-    #return 2 - back_IoU(in_gt, in_pred) - IoU(in_gt, in_pred)
     return 1 - IoU(in_gt, in_pred)
 
   
@@ -138,7 +161,7 @@ while True:
         break
         
         
-        
+# Create the U-Net model's smaller version   
 inputs = Input((768, 768, 3))
 
 c1 = Conv2D(8, (3, 3), activation='relu', padding='same') (inputs)
