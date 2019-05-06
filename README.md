@@ -5,11 +5,11 @@ This project is for Kaggle competiton [Airbus Ship Detection Challenge](https://
 
 It can help you quickly get a **baseline solution**, which is not bad.
 
-![infer_example](https://github.com/abylay2018/ROBT407_Final_Project/blob/master/images/infer_example.jpg)
+![infer_example](https://github.com/abylay2018/ROBT407_Final_Project/blob/master/infer_example.jpg)
 
 
 
-## File strcture
+## File structure
 
     airbus                         
     data balancing                
