@@ -3,8 +3,6 @@ Airbus Ship Detection Challenge
 
 This project is for Kaggle competiton [Airbus Ship Detection Challenge](https://www.kaggle.com/c/airbus-ship-detection).
 
-It can help you quickly get a **baseline solution**, which is not bad.
-
 ![infer_example](https://github.com/abylay2018/ROBT407_Final_Project/blob/master/infer_example.jpg)
 
 
