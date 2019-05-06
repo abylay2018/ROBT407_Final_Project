@@ -42,14 +42,14 @@ Run functions of transforms in airbus.py
 
 Various methods of augmentation (rotating, flipping, shifying, etc.) were used
 
-![dataset annotation](https://github.com/pascal1129/kaggle_airbus_ship_detection/blob/master/444.png)
+![dataset annotation](https://github.com/abylay2018/ROBT407_Final_Project/blob/master/444.png)
 
   
 #### 2. Constructing a model and training
 
 U-NET model for segmenting objects on image was used to detect ships.
 
-![dataset annotation](https://github.com/pascal1129/kaggle_airbus_ship_detection/blob/master/333.jpg)
+![dataset annotation](https://github.com/abylay2018/ROBT407_Final_Project/blob/master/333.jpg)
 
 
 
